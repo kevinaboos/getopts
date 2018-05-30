@@ -92,6 +92,10 @@
 //! }
 //! ```
 
+#![no_std]
+#![feature(alloc)]
+#![feature(slice_concat_ext)]
+
 #![doc(html_logo_url = "https://www.rust-lang.org/logos/rust-logo-128x128-blk-v2.png",
        html_favicon_url = "https://www.rust-lang.org/favicon.ico",
        html_root_url = "https://doc.rust-lang.org/getopts/")]
@@ -104,6 +108,10 @@
                      reason = "use the crates.io `getopts` library instead"))]
 
 #[cfg(test)] #[macro_use] extern crate log;
+#[cfg(test)] #[macro_use] extern crate std;
+
+#[macro_use] extern crate alloc;
+
 
 use self::Name::*;
 use self::HasArg::*;
@@ -114,11 +122,14 @@ use self::SplitWithinState::*;
 use self::Whitespace::*;
 use self::LengthLimit::*;
 
-use std::error::Error;
-use std::ffi::OsStr;
-use std::fmt;
-use std::iter::{repeat, IntoIterator};
-use std::result;
+use core::fmt;
+use core::iter::{repeat, IntoIterator};
+use core::result;
+
+use alloc::{Vec, String};
+use alloc::boxed::Box;
+use alloc::string::ToString;
+use alloc::slice::SliceConcatExt;
 
 /// A description of the options that a program can handle.
 pub struct Options {
@@ -300,21 +311,19 @@ impl Options {
     /// On success returns `Ok(Matches)`. Use methods such as `opt_present`
     /// `opt_str`, etc. to interrogate results.
     /// # Panics
-    ///
+    //
     /// Returns `Err(Fail)` on failure: use the `Debug` implementation of `Fail`
     /// to display information about it.
+    // pub fn parse<S: AsRef<str>>(&self, args: &[S]) -> Result
     pub fn parse<C: IntoIterator>(&self, args: C) -> Result
-        where C::Item: AsRef<OsStr>
+        where C::Item: AsRef<str>
     {
         let opts: Vec<Opt> = self.grps.iter().map(|x| x.long_to_short()).collect();
 
         let mut vals = (0 .. opts.len()).map(|_| Vec::new()).collect::<Vec<Vec<Optval>>>();
         let mut free: Vec<String> = Vec::new();
-        let args = args.into_iter().map(|i| {
-            i.as_ref().to_str().ok_or_else(|| {
-                Fail::UnrecognizedOption(format!("{:?}", i.as_ref()))
-            }).map(|s| s.to_owned())
-        }).collect::<::std::result::Result<Vec<_>,_>>()?;
+
+        let args = args.into_iter().map(|i| i.as_ref().to_string());
         let mut args = args.into_iter().peekable();
         while let Some(cur) = args.next() {
             if !is_arg(&cur) {
@@ -684,17 +693,17 @@ pub enum Fail {
     UnexpectedArgument(String),
 }
 
-impl Error for Fail {
-    fn description(&self) -> &str {
-        match *self {
-            ArgumentMissing(_) => "missing argument",
-            UnrecognizedOption(_) => "unrecognized option",
-            OptionMissing(_) => "missing option",
-            OptionDuplicated(_) => "duplicated option",
-            UnexpectedArgument(_) => "unexpected argument",
-        }
-    }
-}
+// impl Error for Fail {
+//     fn description(&self) -> &str {
+//         match *self {
+//             ArgumentMissing(_) => "missing argument",
+//             UnrecognizedOption(_) => "unrecognized option",
+//             OptionMissing(_) => "missing option",
+//             OptionDuplicated(_) => "duplicated option",
+//             UnexpectedArgument(_) => "unexpected argument",
+//         }
+//     }
+// }
 
 /// The result of parsing a command line with a set of options.
 pub type Result = result::Result<Matches, Fail>;
@@ -1051,8 +1060,10 @@ fn test_split_within() {
 
 #[cfg(test)]
 mod tests {
-    use super::{HasArg, Name, Occur, Opt, Options, ParsingStyle};
-    use super::Fail::*;
+    // use super::{HasArg, Name, Occur, Opt, Options, ParsingStyle};
+    // use super::Fail::*;
+    use super::*;
+    use std::borrow::ToOwned;
 
     // Tests for reqopt
     #[test]
