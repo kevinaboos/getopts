@@ -2,6 +2,10 @@ use super::{HasArg, Name, Occur, Opt, Options, ParsingStyle};
 use super::Fail::*;
 use super::each_split_within;
 
+#[cfg(test)] use std::string::{String, ToString};
+#[cfg(test)] use std::borrow::ToOwned;
+#[cfg(test)] use std::vec::Vec;
+
 #[test]
 fn test_split_within() {
     fn t(s: &str, i: usize, u: &[String]) {
